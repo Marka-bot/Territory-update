@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartographie annotable</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-o9N1j7kG6EyX9NZo2A2n1jY1u2kLkMp2G6I1pJkPwZg=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <h1>Cartographie annotable</h1>
+            <form method="POST" class="coordinates-form">
+                <label for="latitude">Latitude</label>
+                <input type="number" step="any" id="latitude" name="latitude" value="{{ latitude }}" required>
+                <label for="longitude">Longitude</label>
+                <input type="number" step="any" id="longitude" name="longitude" value="{{ longitude }}" required>
+                <button type="submit" class="primary">Mettre à jour la carte</button>
+            </form>
+
+            <div class="tool-section">
+                <label for="color-picker">Couleur des annotations</label>
+                <input type="color" id="color-picker" value="#ff0000">
+            </div>
+
+            <div class="tool-section">
+                <label for="text-input">Texte à placer</label>
+                <input type="text" id="text-input" placeholder="Entrez votre texte">
+                <button type="button" id="add-text-btn">Ajouter du texte</button>
+            </div>
+
+            <div class="tool-section exports">
+                <button type="button" id="export-pdf" class="primary">Export PDF</button>
+                <button type="button" id="export-docx">Export DOCX</button>
+                <p id="export-status"></p>
+            </div>
+
+            <div class="tool-section qr-section">
+                <h2>QR Code</h2>
+                <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" id="qr-image">
+                <p class="coords-display">{{ latitude }}, {{ longitude }}</p>
+            </div>
+        </aside>
+        <main class="map-wrapper">
+            <div id="map-wrapper">
+                {{ map_html|safe }}
+            </div>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7kG6EyX9NZo2A2n1jY1u2kLkMp2G6I1pJkPwZg=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNa5pZ1O5Ry2nV+odIZ6Tn6PvxI6Bfq5lHppZArYrusS4x+h0/pk3jfbQ3VIAtF+wNCz7r+G2kZZgvdU6SeY9w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-/sHBM73n6mPQ0PqSxkbZVqhlV+3I8I4JVXu2fLG3gNsYch0eYRqpMfrQa6RlmKCNt2uQ6Xo8XzY67+l4JdQZ7A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        window.APP_CONTEXT = {
+            mapId: "{{ map_id }}",
+            latitude: {{ latitude|tojson }},
+            longitude: {{ longitude|tojson }},
+            exportPdfUrl: "{{ url_for('export_pdf') }}",
+            exportDocxUrl: "{{ url_for('export_docx') }}"
+        };
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+carto_app/exports/cartes_pdf/*.pdf
+carto_app/exports/cartes_docx/*.docx
