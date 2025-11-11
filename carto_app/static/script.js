@@ -7,27 +7,29 @@
     }
 
     const map = window[mapId];
-    let drawnItems = null;
 
-    map.eachLayer((layer) => {
-        if (layer instanceof L.FeatureGroup && !layer._url) {
-            drawnItems = layer;
-        }
-    });
-
-    if (!drawnItems) {
-        drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
-    }
-
-    const colorPicker = document.getElementById('color-picker');
-    const textInput = document.getElementById('text-input');
-    const addTextBtn = document.getElementById('add-text-btn');
+    const latInput = document.getElementById('lat');
+    const lngInput = document.getElementById('lng');
+    const centerButton = document.getElementById('center-map');
+    const toolButtons = document.querySelectorAll('.tool-button');
+    const lineColorInput = document.getElementById('lineColor');
+    const lineWeightInput = document.getElementById('lineWeight');
+    const lineWeightValue = document.getElementById('lineWeightValue');
+    const textColorInput = document.getElementById('textColor');
+    const textSizeSelect = document.getElementById('textSize');
+    const textBoldInput = document.getElementById('textBold');
+    const textAlignSelect = document.getElementById('textAlign');
     const exportPdfBtn = document.getElementById('export-pdf');
     const exportDocxBtn = document.getElementById('export-docx');
     const exportStatus = document.getElementById('export-status');
 
-    let currentColor = colorPicker ? colorPicker.value : '#ff0000';
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    let activeTool = 'select';
+    let polylineDrawer = null;
+    let editToolbar = null;
+    let deleteToolbar = null;
     let textMode = false;
 
     function setStatus(message, isError = false) {
@@ -36,8 +38,8 @@
         exportStatus.style.color = isError ? '#c22727' : '#1f7a3d';
     }
 
-    function escapeHtml(unsafe) {
-        return unsafe
+    function escapeHtml(value) {
+        return value
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -45,98 +47,209 @@
             .replace(/'/g, '&#039;');
     }
 
-    function ensureFeature(layer, type) {
-        if (!layer.feature) {
-            layer.feature = { type: 'Feature', properties: {} };
-        }
-        layer.feature.properties = layer.feature.properties || {};
-        layer.feature.properties.type = type;
-        if (!layer.feature.properties.color) {
-            layer.feature.properties.color = currentColor;
-        }
-    }
-
-    function applyShapeColor(layer, color) {
-        if (typeof layer.setStyle === 'function') {
-            layer.setStyle({ color, fillColor: color });
-        } else if (layer instanceof L.Polyline) {
-            layer.setStyle({ color });
-        }
-        if (layer.options) {
-            layer.options.color = color;
-            layer.options.fillColor = color;
-        }
-    }
-
-    map.on(L.Draw.Event.CREATED, function (event) {
-        const { layerType, layer } = event;
-        if (layerType === 'marker') {
-            // Ignore marker creation via toolbar since text tool handles markers
+    function updateInputsFromMap() {
+        if (!latInput || !lngInput) {
             return;
         }
-        applyShapeColor(layer, currentColor);
-        ensureFeature(layer, layerType);
-        drawnItems.addLayer(layer);
-    });
-
-    map.on(L.Draw.Event.EDITED, function (event) {
-        const layers = event.layers;
-        layers.eachLayer((layer) => {
-            ensureFeature(layer, layer.feature?.properties?.type || 'shape');
-        });
-    });
-
-    if (colorPicker) {
-        colorPicker.addEventListener('input', (event) => {
-            currentColor = event.target.value;
-        });
+        const center = map.getCenter();
+        latInput.value = center.lat.toFixed(6);
+        lngInput.value = center.lng.toFixed(6);
     }
 
-    if (addTextBtn) {
-        addTextBtn.addEventListener('click', () => {
-            textMode = true;
-            setStatus('Cliquez sur la carte pour placer le texte.');
-            map.getContainer().classList.add('text-mode');
-        });
+    function disableTextMode() {
+        textMode = false;
+        map.getContainer().classList.remove('text-mode');
     }
 
-    function createTextMarker(latlng, textValue) {
-        const safeText = escapeHtml(textValue);
+    function disableToolHandlers() {
+        if (polylineDrawer) {
+            polylineDrawer.disable();
+            polylineDrawer = null;
+        }
+        if (editToolbar) {
+            editToolbar.disable();
+            editToolbar = null;
+        }
+        if (deleteToolbar) {
+            deleteToolbar.disable();
+            deleteToolbar = null;
+        }
+        disableTextMode();
+    }
+
+    function getLineOptions() {
+        const color = lineColorInput ? lineColorInput.value : '#3388ff';
+        const weight = lineWeightInput ? Number(lineWeightInput.value) || 3 : 3;
+        return { color, weight };
+    }
+
+    function refreshPolylineDrawer() {
+        if (activeTool !== 'draw') {
+            return;
+        }
+        if (polylineDrawer) {
+            polylineDrawer.disable();
+        }
+        polylineDrawer = new L.Draw.Polyline(map, { shapeOptions: getLineOptions() });
+        polylineDrawer.enable();
+    }
+
+    function getTextOptions() {
+        return {
+            color: textColorInput ? textColorInput.value : '#111111',
+            size: textSizeSelect ? Number(textSizeSelect.value) || 16 : 16,
+            weight: textBoldInput && textBoldInput.checked ? '700' : '400',
+            align: textAlignSelect ? textAlignSelect.value : 'center'
+        };
+    }
+
+    function buildLabelHtml(text, options) {
+        const safeText = escapeHtml(text);
+        return `<div class="text-label" style="color:${options.color};font-size:${options.size}px;font-weight:${options.weight};text-align:${options.align};">${safeText}</div>`;
+    }
+
+    function setActiveTool(tool) {
+        if (tool === activeTool && tool !== 'text') {
+            return;
+        }
+        disableToolHandlers();
+        activeTool = tool;
+        toolButtons.forEach((button) => {
+            button.classList.toggle('active', button.dataset.tool === tool);
+        });
+
+        switch (tool) {
+            case 'draw':
+                polylineDrawer = new L.Draw.Polyline(map, { shapeOptions: getLineOptions() });
+                polylineDrawer.enable();
+                break;
+            case 'edit':
+                editToolbar = new L.EditToolbar.Edit(map, {
+                    featureGroup: drawnItems,
+                    selectedPathOptions: { maintainColor: true }
+                });
+                editToolbar.enable();
+                break;
+            case 'delete':
+                deleteToolbar = new L.EditToolbar.Delete(map, {
+                    featureGroup: drawnItems
+                });
+                deleteToolbar.enable();
+                break;
+            case 'text':
+                textMode = true;
+                map.getContainer().classList.add('text-mode');
+                break;
+            default:
+                activeTool = 'select';
+                break;
+        }
+    }
+
+    function createTextMarker(latlng, text) {
+        const options = getTextOptions();
         const marker = L.marker(latlng, {
+            draggable: true,
             icon: L.divIcon({
-                className: 'text-marker',
-                html: `<span style="color:${currentColor}">${safeText}</span>`
-            }),
-            interactive: true
+                className: 'text-label-icon',
+                html: buildLabelHtml(text, options)
+            })
         });
-        ensureFeature(marker, 'text');
-        marker.feature.properties.text = textValue;
+
+        marker.options.textContent = text;
+        marker.options.textOptions = { ...options };
+
+        marker.on('dblclick', (event) => {
+            L.DomEvent.stop(event);
+            const currentText = marker.options.textContent || '';
+            const updated = window.prompt('Modifier le texte :', currentText);
+            if (updated === null) {
+                return;
+            }
+            const trimmed = updated.trim();
+            if (!trimmed) {
+                return;
+            }
+            marker.options.textContent = trimmed;
+            marker.setIcon(L.divIcon({
+                className: 'text-label-icon',
+                html: buildLabelHtml(trimmed, marker.options.textOptions)
+            }));
+        });
+
         drawnItems.addLayer(marker);
     }
+
+    map.on('draw:created', (event) => {
+        if (!event.layer) {
+            return;
+        }
+        const layer = event.layer;
+        if (typeof layer.setStyle === 'function') {
+            layer.setStyle(getLineOptions());
+        }
+        drawnItems.addLayer(layer);
+        setActiveTool('select');
+    });
+
+    map.on('draw:editstop', () => {
+        setActiveTool('select');
+    });
+
+    map.on('draw:deletestop', () => {
+        setActiveTool('select');
+    });
 
     map.on('click', (event) => {
         if (!textMode) {
             return;
         }
-        const value = textInput ? textInput.value.trim() : '';
+        const value = window.prompt('Texte du label :');
         if (!value) {
-            setStatus('Veuillez entrer un texte avant de le placer.', true);
             return;
         }
-        createTextMarker(event.latlng, value);
-        setStatus('Texte ajouté sur la carte.');
-        textMode = false;
-        map.getContainer().classList.remove('text-mode');
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return;
+        }
+        createTextMarker(event.latlng, trimmed);
     });
 
-    function getAnnotations() {
-        try {
-            return drawnItems.toGeoJSON();
-        } catch (error) {
-            console.error('Impossible de convertir les annotations :', error);
-            return null;
-        }
+    if (lineWeightInput && lineWeightValue) {
+        lineWeightValue.textContent = `${lineWeightInput.value} px`;
+        lineWeightInput.addEventListener('input', (event) => {
+            lineWeightValue.textContent = `${event.target.value} px`;
+            refreshPolylineDrawer();
+        });
     }
+
+    if (lineColorInput) {
+        lineColorInput.addEventListener('input', refreshPolylineDrawer);
+    }
+
+    toolButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            setActiveTool(button.dataset.tool);
+        });
+    });
+
+    if (centerButton) {
+        centerButton.addEventListener('click', () => {
+            if (!latInput || !lngInput) {
+                return;
+            }
+            const lat = parseFloat(latInput.value);
+            const lng = parseFloat(lngInput.value);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                setStatus('Coordonnées invalides.', true);
+                return;
+            }
+            map.setView([lat, lng], map.getZoom());
+        });
+    }
+
+    map.on('moveend', updateInputsFromMap);
+    updateInputsFromMap();
 
     async function exportMap(format) {
         const targetUrl = format === 'pdf' ? context.exportPdfUrl : context.exportDocxUrl;
@@ -149,31 +262,46 @@
             setStatus('Carte introuvable pour export.', true);
             return;
         }
-        setStatus('Export en cours...');
+
+        setStatus('Capture de la carte en cours...');
         try {
-            const canvas = await html2canvas(mapElement, { useCORS: true, logging: false });
-            const imageData = canvas.toDataURL('image/png');
+            const canvas = await html2canvas(mapElement, {
+                useCORS: true,
+                logging: false,
+                backgroundColor: null
+            });
+            const image = canvas.toDataURL('image/png');
             const response = await fetch(targetUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    imageData,
-                    annotations: getAnnotations(),
-                    latitude: document.getElementById('latitude')?.value,
-                    longitude: document.getElementById('longitude')?.value
-                })
+                body: JSON.stringify({ image })
             });
+
             if (!response.ok) {
-                throw new Error('Réponse invalide du serveur');
+                let errorMessage = `Erreur serveur (${response.status})`;
+                try {
+                    const payload = await response.json();
+                    if (payload && payload.error) {
+                        errorMessage = payload.error;
+                    }
+                } catch (jsonError) {
+                    console.debug('Réponse non JSON pour erreur d\'export.', jsonError);
+                }
+                throw new Error(errorMessage);
             }
-            const result = await response.json();
-            if (result.success) {
-                setStatus(`Fichier ${format.toUpperCase()} créé : ${result.filename}`);
-            } else {
-                throw new Error(result.error || 'Export impossible');
-            }
+
+            const blob = await response.blob();
+            const downloadUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = format === 'pdf' ? 'carte.pdf' : 'carte.docx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
+            setStatus(`Export ${format.toUpperCase()} prêt.`);
         } catch (error) {
             console.error(error);
             setStatus(`Erreur lors de l'export : ${error.message}`, true);
@@ -183,6 +311,7 @@
     if (exportPdfBtn) {
         exportPdfBtn.addEventListener('click', () => exportMap('pdf'));
     }
+
     if (exportDocxBtn) {
         exportDocxBtn.addEventListener('click', () => exportMap('docx'));
     }

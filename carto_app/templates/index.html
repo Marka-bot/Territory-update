@@ -4,56 +4,81 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cartographie annotable</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-o9N1j7kG6EyX9NZo2A2n1jY1u2kLkMp2G6I1pJkPwZg=" crossorigin="" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="app-container">
-        <aside class="sidebar">
-            <h1>Cartographie annotable</h1>
-            <form method="POST" class="coordinates-form">
-                <label for="latitude">Latitude</label>
-                <input type="number" step="any" id="latitude" name="latitude" value="{{ latitude }}" required>
-                <label for="longitude">Longitude</label>
-                <input type="number" step="any" id="longitude" name="longitude" value="{{ longitude }}" required>
-                <button type="submit" class="primary">Mettre à jour la carte</button>
-            </form>
-
-            <div class="tool-section">
-                <label for="color-picker">Couleur des annotations</label>
-                <input type="color" id="color-picker" value="#ff0000">
+    <div class="app-shell">
+        <header class="control-panel">
+            <div class="panel-block coordinates-block">
+                <h1>Cartographie annotable</h1>
+                <div class="field-row">
+                    <label for="lat">Latitude</label>
+                    <input type="number" step="any" id="lat" value="{{ '%.6f'|format(latitude) }}" required>
+                    <label for="lng">Longitude</label>
+                    <input type="number" step="any" id="lng" value="{{ '%.6f'|format(longitude) }}" required>
+                    <button type="button" id="center-map" class="primary">Centrer</button>
+                </div>
             </div>
-
-            <div class="tool-section">
-                <label for="text-input">Texte à placer</label>
-                <input type="text" id="text-input" placeholder="Entrez votre texte">
-                <button type="button" id="add-text-btn">Ajouter du texte</button>
+            <div class="panel-block tools-block">
+                <span class="block-title">Outils</span>
+                <div class="button-row">
+                    <button type="button" class="tool-button active" data-tool="select" id="tool-select">Sélection</button>
+                    <button type="button" class="tool-button" data-tool="draw" id="tool-draw">Crayon</button>
+                    <button type="button" class="tool-button" data-tool="text" id="tool-text">Texte</button>
+                    <button type="button" class="tool-button" data-tool="edit" id="tool-edit">Éditer</button>
+                    <button type="button" class="tool-button" data-tool="delete" id="tool-delete">Supprimer</button>
+                </div>
             </div>
-
-            <div class="tool-section exports">
+            <div class="panel-block line-options">
+                <span class="block-title">Options crayon</span>
+                <div class="field-row">
+                    <label for="lineColor">Couleur</label>
+                    <input type="color" id="lineColor" value="#3388ff">
+                    <label for="lineWeight">Épaisseur</label>
+                    <input type="range" id="lineWeight" min="1" max="10" value="3">
+                    <span id="lineWeightValue">3 px</span>
+                </div>
+            </div>
+            <div class="panel-block text-options">
+                <span class="block-title">Options texte</span>
+                <div class="field-grid">
+                    <label for="textColor">Couleur</label>
+                    <input type="color" id="textColor" value="#111111">
+                    <label for="textSize">Taille</label>
+                    <select id="textSize">
+                        {% for size in [12, 14, 16, 18, 20, 24, 28, 32, 36] %}
+                        <option value="{{ size }}" {% if size == 18 %}selected{% endif %}>{{ size }} px</option>
+                        {% endfor %}
+                    </select>
+                    <label for="textBold" class="checkbox-label">
+                        <input type="checkbox" id="textBold"> Gras
+                    </label>
+                    <label for="textAlign">Alignement</label>
+                    <select id="textAlign">
+                        <option value="left">Gauche</option>
+                        <option value="center" selected>Centre</option>
+                        <option value="right">Droite</option>
+                    </select>
+                </div>
+            </div>
+            <div class="panel-block export-block">
                 <button type="button" id="export-pdf" class="primary">Export PDF</button>
                 <button type="button" id="export-docx">Export DOCX</button>
                 <p id="export-status"></p>
             </div>
-
-            <div class="tool-section qr-section">
-                <h2>QR Code</h2>
-                <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" id="qr-image">
-                <p class="coords-display">{{ latitude }}, {{ longitude }}</p>
-            </div>
-        </aside>
-        <main class="map-wrapper">
+        </header>
+        <main class="map-area">
             <div id="map-wrapper">
                 {{ map_html|safe }}
             </div>
         </main>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7kG6EyX9NZo2A2n1jY1u2kLkMp2G6I1pJkPwZg=" crossorigin=""></script>
-    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNa5pZ1O5Ry2nV+odIZ6Tn6PvxI6Bfq5lHppZArYrusS4x+h0/pk3jfbQ3VIAtF+wNCz7r+G2kZZgvdU6SeY9w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-/sHBM73n6mPQ0PqSxkbZVqhlV+3I8I4JVXu2fLG3gNsYch0eYRqpMfrQa6RlmKCNt2uQ6Xo8XzY67+l4JdQZ7A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
         window.APP_CONTEXT = {
             mapId: "{{ map_id }}",
