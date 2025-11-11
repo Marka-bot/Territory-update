@@ -16,7 +16,8 @@
     const lineWeightInput = document.getElementById('lineWeight');
     const lineWeightValue = document.getElementById('lineWeightValue');
     const textColorInput = document.getElementById('textColor');
-    const textSizeSelect = document.getElementById('textSize');
+    const fontFamilySelect = document.getElementById('fontFamily');
+    const fontSizeSelect = document.getElementById('fontSize');
     const textBoldInput = document.getElementById('textBold');
     const textAlignSelect = document.getElementById('textAlign');
     const exportPdfBtn = document.getElementById('export-pdf');
@@ -32,6 +33,12 @@
     let deleteToolbar = null;
     let textMode = false;
 
+    let currentFontFamily = 'Arial';
+    let currentFontSize = 16;
+    let currentTextColor = '#000000';
+    let currentAlign = 'center';
+    let currentBold = false;
+
     function setStatus(message, isError = false) {
         if (!exportStatus) return;
         exportStatus.textContent = message;
@@ -39,7 +46,10 @@
     }
 
     function escapeHtml(value) {
-        return value
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return String(value)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
@@ -96,16 +106,25 @@
 
     function getTextOptions() {
         return {
-            color: textColorInput ? textColorInput.value : '#111111',
-            size: textSizeSelect ? Number(textSizeSelect.value) || 16 : 16,
-            weight: textBoldInput && textBoldInput.checked ? '700' : '400',
-            align: textAlignSelect ? textAlignSelect.value : 'center'
+            color: currentTextColor,
+            size: currentFontSize,
+            weight: currentBold ? '700' : '400',
+            align: currentAlign,
+            fontFamily: currentFontFamily
         };
     }
 
     function buildLabelHtml(text, options) {
         const safeText = escapeHtml(text);
-        return `<div class="text-label" style="color:${options.color};font-size:${options.size}px;font-weight:${options.weight};text-align:${options.align};">${safeText}</div>`;
+        const formatted = safeText.replace(/\n/g, '<br>');
+        return `<div class="text-label" style="color:${options.color};font-size:${options.size}px;font-weight:${options.weight};text-align:${options.align};font-family:${options.fontFamily};">${formatted}</div>`;
+    }
+
+    function updateMarkerLabel(marker, text, options) {
+        marker.setIcon(L.divIcon({
+            className: 'text-label-icon',
+            html: buildLabelHtml(text, options)
+        }));
     }
 
     function setActiveTool(tool) {
@@ -161,23 +180,190 @@
 
         marker.on('dblclick', (event) => {
             L.DomEvent.stop(event);
-            const currentText = marker.options.textContent || '';
-            const updated = window.prompt('Modifier le texte :', currentText);
-            if (updated === null) {
-                return;
-            }
-            const trimmed = updated.trim();
-            if (!trimmed) {
-                return;
-            }
-            marker.options.textContent = trimmed;
-            marker.setIcon(L.divIcon({
-                className: 'text-label-icon',
-                html: buildLabelHtml(trimmed, marker.options.textOptions)
-            }));
+            openTextEditor(marker);
         });
 
         drawnItems.addLayer(marker);
+    }
+
+    function openTextEditor(marker) {
+        const originalText = marker.options.textContent || '';
+        const originalOptions = {
+            color: '#000000',
+            size: 16,
+            weight: '400',
+            align: 'center',
+            fontFamily: 'Arial',
+            ...(marker.options.textOptions || {})
+        };
+
+        if (document.body.querySelector('.text-editor-overlay')) {
+            return;
+        }
+
+        marker.options.textOptions = { ...originalOptions };
+        updateMarkerLabel(marker, originalText, marker.options.textOptions);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'text-editor-overlay';
+
+        const dialog = document.createElement('div');
+        dialog.className = 'text-editor-dialog';
+        overlay.appendChild(dialog);
+
+        const title = document.createElement('h2');
+        title.textContent = 'Éditer le texte';
+        dialog.appendChild(title);
+
+        const fields = document.createElement('div');
+        fields.className = 'editor-fields';
+        dialog.appendChild(fields);
+
+        const textLabel = document.createElement('label');
+        textLabel.textContent = 'Contenu';
+        const textArea = document.createElement('textarea');
+        textArea.value = originalText;
+        textLabel.appendChild(textArea);
+        fields.appendChild(textLabel);
+
+        const fontLabel = document.createElement('label');
+        fontLabel.textContent = 'Police';
+        const fontSelect = document.createElement('select');
+        ['Arial', 'Verdana', 'Courier New', 'Roboto', 'Times New Roman'].forEach((name) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            fontSelect.appendChild(option);
+        });
+        fontSelect.value = originalOptions.fontFamily || 'Arial';
+        fontLabel.appendChild(fontSelect);
+        fields.appendChild(fontLabel);
+
+        const sizeLabel = document.createElement('label');
+        sizeLabel.textContent = 'Taille';
+        const sizeSelect = document.createElement('select');
+        [12, 14, 16, 18, 24, 32].forEach((value) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = `${value} px`;
+            sizeSelect.appendChild(option);
+        });
+        if (Number.isFinite(originalOptions.size) && ![...sizeSelect.options].some((opt) => Number(opt.value) === Number(originalOptions.size))) {
+            const customOption = document.createElement('option');
+            customOption.value = originalOptions.size;
+            customOption.textContent = `${originalOptions.size} px`;
+            sizeSelect.appendChild(customOption);
+        }
+        sizeSelect.value = String(originalOptions.size || 16);
+        sizeLabel.appendChild(sizeSelect);
+        fields.appendChild(sizeLabel);
+
+        const colorLabel = document.createElement('label');
+        colorLabel.textContent = 'Couleur';
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = originalOptions.color || '#000000';
+        colorLabel.appendChild(colorInput);
+        fields.appendChild(colorLabel);
+
+        const alignLabel = document.createElement('label');
+        alignLabel.textContent = 'Alignement';
+        const alignSelect = document.createElement('select');
+        [
+            { value: 'left', text: 'Gauche' },
+            { value: 'center', text: 'Centre' },
+            { value: 'right', text: 'Droite' }
+        ].forEach((item) => {
+            const option = document.createElement('option');
+            option.value = item.value;
+            option.textContent = item.text;
+            alignSelect.appendChild(option);
+        });
+        alignSelect.value = originalOptions.align || 'center';
+        alignLabel.appendChild(alignSelect);
+        fields.appendChild(alignLabel);
+
+        const boldLabel = document.createElement('label');
+        boldLabel.className = 'inline-checkbox';
+        const boldInput = document.createElement('input');
+        boldInput.type = 'checkbox';
+        boldInput.checked = ['700', 'bold', 700].includes(originalOptions.weight);
+        const boldSpan = document.createElement('span');
+        boldSpan.textContent = 'Gras';
+        boldLabel.appendChild(boldInput);
+        boldLabel.appendChild(boldSpan);
+        fields.appendChild(boldLabel);
+
+        const actions = document.createElement('div');
+        actions.className = 'dialog-actions';
+        dialog.appendChild(actions);
+
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.textContent = 'Annuler';
+        const confirmButton = document.createElement('button');
+        confirmButton.type = 'button';
+        confirmButton.className = 'primary';
+        confirmButton.textContent = 'Fermer';
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+
+        function applyChanges() {
+            const options = {
+                color: colorInput.value,
+                size: Number(sizeSelect.value) || 16,
+                weight: boldInput.checked ? '700' : '400',
+                align: alignSelect.value,
+                fontFamily: fontSelect.value
+            };
+            const textValue = textArea.value;
+            marker.options.textContent = textValue;
+            marker.options.textOptions = { ...options };
+            updateMarkerLabel(marker, textValue, marker.options.textOptions);
+        }
+
+        function revertChanges() {
+            marker.options.textContent = originalText;
+            marker.options.textOptions = { ...originalOptions };
+            updateMarkerLabel(marker, originalText, marker.options.textOptions);
+        }
+
+        function closeEditor(keepChanges) {
+            document.removeEventListener('keydown', onKeyDown);
+            if (!keepChanges) {
+                revertChanges();
+            }
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }
+
+        function onKeyDown(event) {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeEditor(false);
+            }
+        }
+
+        textArea.addEventListener('input', applyChanges);
+        fontSelect.addEventListener('change', applyChanges);
+        sizeSelect.addEventListener('change', applyChanges);
+        colorInput.addEventListener('input', applyChanges);
+        alignSelect.addEventListener('change', applyChanges);
+        boldInput.addEventListener('change', applyChanges);
+
+        cancelButton.addEventListener('click', () => {
+            closeEditor(false);
+        });
+
+        confirmButton.addEventListener('click', () => {
+            closeEditor(true);
+        });
+
+        document.addEventListener('keydown', onKeyDown);
+        document.body.appendChild(overlay);
+        textArea.focus();
+        textArea.setSelectionRange(textArea.value.length, textArea.value.length);
     }
 
     map.on('draw:created', (event) => {
@@ -214,6 +400,44 @@
         }
         createTextMarker(event.latlng, trimmed);
     });
+
+    if (fontFamilySelect) {
+        currentFontFamily = fontFamilySelect.value || currentFontFamily;
+        fontFamilySelect.addEventListener('change', (event) => {
+            currentFontFamily = event.target.value;
+        });
+    }
+
+    if (fontSizeSelect) {
+        currentFontSize = Number(fontSizeSelect.value) || currentFontSize;
+        fontSizeSelect.addEventListener('change', (event) => {
+            const value = Number(event.target.value);
+            if (Number.isFinite(value)) {
+                currentFontSize = value;
+            }
+        });
+    }
+
+    if (textColorInput) {
+        currentTextColor = textColorInput.value || currentTextColor;
+        textColorInput.addEventListener('input', (event) => {
+            currentTextColor = event.target.value;
+        });
+    }
+
+    if (textBoldInput) {
+        currentBold = Boolean(textBoldInput.checked);
+        textBoldInput.addEventListener('change', (event) => {
+            currentBold = event.target.checked;
+        });
+    }
+
+    if (textAlignSelect) {
+        currentAlign = textAlignSelect.value || currentAlign;
+        textAlignSelect.addEventListener('change', (event) => {
+            currentAlign = event.target.value;
+        });
+    }
 
     if (lineWeightInput && lineWeightValue) {
         lineWeightValue.textContent = `${lineWeightInput.value} px`;
