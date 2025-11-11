@@ -1,0 +1,6 @@
+Flask
+folium
+qrcode
+pdfkit
+python-docx
+Pillow
