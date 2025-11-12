@@ -1,4 +1,7 @@
 __pycache__/
 *.pyc
-carto_app/exports/cartes_pdf/*.pdf
-carto_app/exports/cartes_docx/*.docx
+*.pyo
+*.pyd
+.env
+.venv/
+.DS_Store
