@@ -4,16 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carte Leaflet</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         html, body {
             margin: 0;
             height: 100%;
+            overflow: hidden;
             font-family: sans-serif;
         }
         #map {
-            height: 100vh;
-            width: 100vw;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
         .controls {
             position: absolute;
@@ -40,10 +44,10 @@
 <body>
     <div id="map"></div>
     <div class="controls">
-        <button id="exportButton" class="export-button">Exporter en PDF</button>
+        <button id="exportButton" class="export-button" onclick="exportMapToPDF()">Exporter en PDF</button>
     </div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaPHLGKm19cM0W8QGgwjPeU+v3+kzoZ9hk5mAOai60+kfSiPi0a/QfDehqI5JdAO0cT9iG8I7kZ0p8U7SejGg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="{{ url_for('static', filename='main.js') }}" defer></script>
 </body>
 </html>

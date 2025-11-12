@@ -1,39 +1,55 @@
-let exportButton;
+let leafletMap = null;
+let exportButton = null;
 
 function initializeMap() {
     const mapElement = document.getElementById('map');
-    if (!mapElement || typeof L === 'undefined') {
-        console.error('Leaflet introuvable ou élément #map manquant.');
+    if (!mapElement) {
+        console.error('Élément #map introuvable.');
+        return;
+    }
+    if (typeof L === 'undefined') {
+        console.error('Leaflet n\'est pas chargé.');
         return;
     }
 
-    const map = L.map(mapElement, {
+    leafletMap = L.map(mapElement, {
         center: [46.2276, 2.2137],
         zoom: 6,
         zoomSnap: 0.33,
         zoomDelta: 0.33,
-        scrollWheelZoom: true
+        scrollWheelZoom: true,
+        wheelDebounceTime: 10,
+        wheelPxPerZoomLevel: 60
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributeurs'
-    }).addTo(map);
+    }).addTo(leafletMap);
+
+    setTimeout(() => {
+        leafletMap.invalidateSize();
+    }, 0);
 }
 
 async function exportMapToPDF() {
     if (!exportButton) {
-        return;
+        exportButton = document.getElementById('exportButton');
     }
 
-    const mapElement = document.getElementById('map');
-    if (!mapElement) {
-        return;
+    if (exportButton) {
+        exportButton.disabled = true;
     }
-
-    exportButton.disabled = true;
 
     try {
+        const mapElement = document.getElementById('map');
+        if (!mapElement) {
+            throw new Error('Carte introuvable');
+        }
+        if (typeof html2canvas !== 'function') {
+            throw new Error('html2canvas indisponible');
+        }
+
         const canvas = await html2canvas(mapElement, {
             useCORS: true,
             scale: 2
@@ -49,7 +65,7 @@ async function exportMapToPDF() {
         });
 
         if (!response.ok) {
-            throw new Error('Export failed');
+            throw new Error('Export PDF échoué');
         }
 
         const blob = await response.blob();
@@ -63,16 +79,17 @@ async function exportMapToPDF() {
         window.URL.revokeObjectURL(url);
     } catch (error) {
         console.error(error);
-        alert("Une erreur est survenue lors de l'export PDF.");
+        alert('Une erreur est survenue lors de l\'export PDF.');
     } finally {
-        exportButton.disabled = false;
+        if (exportButton) {
+            exportButton.disabled = false;
+        }
     }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    initializeMap();
     exportButton = document.getElementById('exportButton');
-    if (exportButton) {
-        exportButton.addEventListener('click', exportMapToPDF);
-    }
+    initializeMap();
 });
+
+window.exportMapToPDF = exportMapToPDF;

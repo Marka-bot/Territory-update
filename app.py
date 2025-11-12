@@ -29,7 +29,7 @@ def export_pdf():
         return jsonify({"error": "Image data missing"}), 400
 
     image_buffer = decode_image(image_data)
-    image = Image.open(image_buffer)
+    image = Image.open(image_buffer).convert("RGB")
 
     pdf_buffer = BytesIO()
     page_width, page_height = A4
