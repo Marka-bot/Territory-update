@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte Leaflet</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+4J47TsHfC2NhGJfuwZQ1fxCykXB5kJb9bJfX+4mU=" crossorigin="" />
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            font-family: sans-serif;
+        }
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        .controls {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+        }
+        .export-button {
+            padding: 10px 16px;
+            background-color: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        .export-button:disabled {
+            background-color: #94a3b8;
+            cursor: wait;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="controls">
+        <button id="exportButton" class="export-button">Exporter en PDF</button>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-sA+oUhNQ5d8+Q6Z6oOIZf0pFj1NxP2Pe6G8R0iQV4b8=" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaPHLGKm19cM0W8QGgwjPeU+v3+kzoZ9hk5mAOai60+kfSiPi0a/QfDehqI5JdAO0cT9iG8I7kZ0p8U7SejGg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
