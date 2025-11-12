@@ -1,23 +1,24 @@
-const map = L.map('map', {
-    center: [46.2276, 2.2137],
-    zoom: 6,
-    zoomSnap: 0.33,
-    zoomDelta: 0.33,
-    scrollWheelZoom: true
-});
+function initializeMap() {
+    const map = L.map('map', {
+        center: [46.2276, 2.2137],
+        zoom: 6,
+        zoomSnap: 0.33,
+        zoomDelta: 0.33,
+        scrollWheelZoom: true
+    });
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
 
-const exportButton = document.getElementById('exportButton');
+    const exportButton = document.getElementById('exportButton');
 
-async function exportMapToPDF() {
-    if (!exportButton) {
-        return;
-    }
-    exportButton.disabled = true;
+    async function exportMapToPDF() {
+        if (!exportButton) {
+            return;
+        }
+        exportButton.disabled = true;
     try {
         const mapElement = document.getElementById('map');
         const canvas = await html2canvas(mapElement, {
@@ -53,8 +54,15 @@ async function exportMapToPDF() {
     } finally {
         exportButton.disabled = false;
     }
+    }
+
+    if (exportButton) {
+        exportButton.addEventListener('click', exportMapToPDF);
+    }
 }
 
-if (exportButton) {
-    exportButton.addEventListener('click', exportMapToPDF);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeMap);
+} else {
+    initializeMap();
 }
